@@ -1,0 +1,36 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.eggs/
+*.egg-info/
+dist/
+build/
+
+# --- Secrets ---
+.env
+
+# --- IDE ---
+.idea/
+.vscode/
+*.iml
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Runtime data ---
+data/vectors/*
+data/conversation_logs/*
+*.log
+
+# --- Testing ---
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
