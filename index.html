@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 知识库助手（交互原型）</title>
+<style>
+  :root {
+    --bg: #0d0f14; --surface: #151821; --surface2: #1c202b; --border: #272c3a;
+    --text: #e8eaf0; --muted: #8b93a5; --accent: #6366f1; --accent2: #8b5cf6;
+    --ok: #22c55e; --user: #2f81f7; --warn: #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* ===== Header ===== */
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 11px 20px;
+    background: linear-gradient(90deg, #141722, #181a28); border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .logo { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; color: #fff; }
+  .brand { font-size: 15px; font-weight: 600; }
+  .brand small { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
+  .chips { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; align-items: center; }
+  .chip { font-size: 11px; padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border);
+    color: var(--muted); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  .chip.off { opacity: .55; }
+  .chip.off .dot { background: #3a4150; box-shadow: none; }
+  .chip.proto { border-color: #4c3d1f; color: var(--warn); font-weight: 600; }
+  .chip.proto .dot { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+  .chip.switch { cursor: pointer; user-select: none; }
+  .chip.switch:hover { border-color: var(--accent); }
+  .btn {
+    font-size: 12px; padding: 5px 12px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text); transition: all .15s;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; color: #fff; font-weight: 600; }
+  .lang-btn { font-weight: 600; }
+
+  /* ===== Layout ===== */
+  .wrap { display: flex; flex: 1; min-height: 0; }
+  aside { width: 268px; min-width: 268px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+  .side-title { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); padding: 16px 16px 8px; }
+  .kb-list { overflow-y: auto; padding: 0 10px; }
+  .kb-item { padding: 10px 12px; border-radius: 9px; margin-bottom: 6px; background: var(--surface2); border: 1px solid var(--border); }
+  .kb-item .t { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+  .kb-item .m { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .new-chat { margin: 12px; padding: 10px; border-radius: 9px; border: none; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; font-size: 13px; font-weight: 600; }
+  .new-chat:hover { opacity: .9; }
+  .side-foot { margin-top: auto; padding: 12px 16px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); line-height: 1.7; }
+
+  /* ===== Chat ===== */
+  main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .chat { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+  .msg { display: flex; flex-direction: column; max-width: 82%; animation: fadeIn .25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .msg.user { align-self: flex-end; align-items: flex-end; }
+  .msg.bot { align-self: flex-start; align-items: flex-start; }
+  .bubble { padding: 12px 15px; border-radius: 14px; font-size: 14px; line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
+  .msg.user .bubble { background: var(--user); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.bot .bubble { background: var(--surface2); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .msg.bot .role { font-size: 11px; color: var(--muted); margin-bottom: 5px; display: flex; align-items: center; gap: 6px; }
+  .msg.bot .role .speak { cursor: pointer; font-size: 12px; opacity: .7; }
+  .msg.bot .role .speak:hover { opacity: 1; }
+  .sources { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .src { font-size: 11px; padding: 4px 9px; border-radius: 14px; cursor: pointer;
+    background: #1a1e2a; border: 1px solid var(--border); color: var(--muted); transition: all .15s; }
+  .src:hover { border-color: var(--accent); color: var(--text); }
+  .src.web { border-color: #4c3d1f; }
+  .src .bar { display: inline-block; width: 40px; height: 5px; background: #2a2f3d; border-radius: 3px; margin-left: 7px; vertical-align: middle; overflow: hidden; }
+  .src .bar .fill { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 3px; }
+  .src-body { display: none; margin-top: 8px; padding: 10px 12px; border-radius: 9px; background: #131722; border: 1px solid var(--border); font-size: 12px; color: var(--muted); line-height: 1.6; max-width: 520px; }
+  .src-body.show { display: block; }
+  .searching { font-size: 12px; color: var(--warn); margin-top: 8px; display: flex; align-items: center; gap: 6px; }
+  .empty { margin: auto; text-align: center; color: var(--muted); max-width: 520px; }
+  .empty .big { font-size: 34px; margin-bottom: 12px; }
+  .empty h2 { font-size: 18px; color: var(--text); margin-bottom: 8px; font-weight: 600; }
+  .empty p { font-size: 13px; line-height: 1.8; }
+  .empty .proto-note { font-size: 11px; color: var(--muted); margin-top: 10px; opacity: .8; }
+  .sug { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 18px; }
+  .sug .s { font-size: 12px; padding: 7px 14px; border-radius: 18px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; transition: all .15s; }
+  .sug .s:hover { border-color: var(--accent); color: var(--text); }
+  .feat-title, .try-title { font-size: 11px; letter-spacing: 1px; color: var(--muted); margin-top: 22px; }
+  .features { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; }
+  .features .f { font-size: 12px; padding: 6px 12px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); }
+  .typing { display: inline-flex; gap: 4px; padding: 4px 0; }
+  .typing span { width: 6px; height: 6px; background: var(--muted); border-radius: 50%; animation: blink 1.2s infinite; }
+  .typing span:nth-child(2) { animation-delay: .2s; } .typing span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,80%,100% { opacity:.2 } 40% { opacity:1 } }
+
+  /* ===== Input ===== */
+  .input-bar { display: flex; gap: 8px; padding: 13px 18px; border-top: 1px solid var(--border); background: var(--surface); align-items: center; }
+  .input-bar input { flex: 1; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 14px; outline: none; }
+  .input-bar input:focus { border-color: var(--accent); }
+  .mic { width: 42px; height: 42px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); cursor: pointer; font-size: 18px; transition: all .15s; flex-shrink: 0; }
+  .mic:hover { border-color: var(--accent); }
+  .mic.rec { background: #e11d48; border-color: #e11d48; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(225,29,72,.5); } 100% { box-shadow: 0 0 0 12px rgba(225,29,72,0); } }
+  .send { padding: 0 24px; height: 42px; border-radius: 10px; border: none; cursor: pointer; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; font-size: 14px; font-weight: 600; flex-shrink: 0; }
+  .send:hover { opacity: .9; }
+
+  /* ===== Settings modal ===== */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 50; }
+  .modal-bg.show { display: flex; }
+  .modal { width: 420px; max-width: 92vw; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+  .modal h3 { font-size: 15px; margin-bottom: 14px; }
+  .modal label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 5px; }
+  .modal input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 13px; outline: none; }
+  .modal input:focus { border-color: var(--accent); }
+  .modal .hint { font-size: 11px; color: var(--muted); margin-top: 12px; line-height: 1.6; }
+  .modal .row { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">AI</div>
+    <div class="brand"><span data-i18n="brand">AI 知识库助手</span><small data-i18n="brandSub">把文档变成可问答的助手 · 交互原型</small></div>
+    <div class="chips">
+      <span class="chip proto"><span class="dot"></span><span data-i18n="protoTag">演示原型</span></span>
+      <span class="chip"><span class="dot"></span><span data-i18n="cMemory">记忆</span></span>
+      <span class="chip"><span class="dot"></span><span data-i18n="cRag">RAG 检索</span></span>
+      <span class="chip switch" id="chipWeb" onclick="toggleWeb()"><span class="dot"></span><span data-i18n="cWeb">联网搜索</span></span>
+      <span class="chip" id="chipLLM" style="display:none"><span class="dot"></span>GPT</span>
+      <button class="btn lang-btn" id="langBtn" onclick="toggleLang()">EN</button>
+      <a class="btn" href="https://github.com/zz10965-alt/ai-conversational-agent" target="_blank" rel="noopener" style="text-decoration:none" data-i18n="viewSource">查看源码 ↗</a>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <aside>
+      <div class="side-title" data-i18n="sideTitle">📚 已索引知识库</div>
+      <div class="kb-list" id="kbList"></div>
+      <div class="new-chat" onclick="newChat()" data-i18n="newChat">＋ 新对话</div>
+      <div class="side-foot" id="sideFoot"></div>
+    </aside>
+
+    <main>
+      <div class="chat" id="chat"></div>
+      <div class="input-bar">
+        <button class="mic" id="mic" onclick="toggleMic()" title="语音输入">🎤</button>
+        <input id="input" placeholder="" autocomplete="off">
+        <button class="send" onclick="send()" data-i18n="send">发送</button>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-bg" id="modalBg">
+    <div class="modal">
+      <h3 data-i18n="setTitle">接入大模型（可选）</h3>
+      <label data-i18n="setKey">API Key</label>
+      <input id="cfgKey" type="password" placeholder="sk-...">
+      <label data-i18n="setUrl">Base URL</label>
+      <input id="cfgUrl" value="https://api.openai.com/v1">
+      <label data-i18n="setModel">模型</label>
+      <input id="cfgModel" value="gpt-4o-mini">
+      <div class="hint" data-i18n="setHint">不填则默认离线演示：回答来自知识库检索片段。填入后可生成自然回答（保存在本机浏览器，不会写进文件）。</div>
+      <div class="row">
+        <button class="btn" onclick="closeSettings()" data-i18n="cancel">取消</button>
+        <button class="btn primary" onclick="saveSettings()" data-i18n="save">保存</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ================= 1. 知识库（中英双语） ================= */
+const KB_ZH = [
+  {title:'产品简介', content:'「AI 知识库助手」是一款把团队文档变成智能问答助手的工具。只需上传 PDF、Word、Markdown 等资料，它就能自动理解内容；成员用自然语言提问，它从资料中检索答案并标注出处，不必再翻找文档。\n\n适合客服答疑、内部知识共享、新人培训等场景，让团队知识「问得出来、用得起来」。'},
+  {title:'核心功能', content:'1）智能问答：用自然语言提问，基于资料回答并标注来源，点一下即可查看原文。\n\n2）多轮对话：记住上下文，支持连续追问，像真人一样交流。\n\n3）语音交互：支持语音提问与语音播报，解放双手。\n\n4）联网搜索：资料没有的最新信息，可实时联网补充。\n\n5）多语言：中英文界面与问答，一键切换。'},
+  {title:'使用场景', content:'客服支持：把产品手册、FAQ 交给助手，客服与用户都能快速得到标准答案。\n\n内部知识库：沉淀制度、流程、经验文档，新老员工随时查询。\n\n新人培训：遇到问题直接问，不用到处找人、翻旧文件。\n\n团队协作：跨部门共享资料，减少重复答疑，知识随取随用。'},
+  {title:'常见问题', content:'问：支持哪些文件格式？\n答：PDF、Word、TXT、Markdown 等常见格式均可上传。\n\n问：回答靠谱吗？\n答：回答基于你上传的资料并标注出处，可点击来源查看原文核对。\n\n问：需要自己训练模型吗？\n答：不需要，上传文档即可，系统自动完成解析与索引。\n\n问：资料安全吗？\n答：资料仅用于你的知识库，支持私有化部署，数据留在自己环境。'},
+];
+const KB_EN = [
+  {title:'About', content:'"AI Knowledge Assistant" turns your team\'s documents into a question-answering assistant. Upload PDF, Word or Markdown files and it understands them automatically; members ask in natural language and get answers grounded in the material, with sources cited — no more digging through documents.\n\nGreat for customer support, internal knowledge sharing and onboarding.'},
+  {title:'Features', content:'1) Smart Q&A: ask in natural language, get answers grounded in your docs with cited sources — click to view the original text.\n\n2) Multi-turn dialogue: remembers context for follow-up questions.\n\n3) Voice: ask by voice and listen to spoken answers.\n\n4) Web search: pull in the latest info when your docs don\'t cover it.\n\n5) Multilingual: English and Chinese UI and answers.'},
+  {title:'Use cases', content:'Customer support: feed manuals and FAQs so agents and users get consistent answers fast.\n\nInternal knowledge base: capture policies, processes and experience for anyone to query.\n\nOnboarding: new hires just ask instead of chasing people or digging through old files.\n\nTeam collaboration: share docs across teams and cut repetitive Q&A.'},
+  {title:'FAQ', content:'Q: Which file formats are supported?\nA: PDF, Word, TXT and Markdown.\n\nQ: Are the answers reliable?\nA: Answers are grounded in your uploaded material and cite sources; click a source to verify.\n\nQ: Do I need to train a model?\nA: No — upload documents and the system parses and indexes them automatically.\n\nQ: Is my data safe?\nA: It stays in your own knowledge base; private deployment keeps data in your environment.'},
+];
+
+/* ================= 2. 双语 UI 文案 ================= */
+const STRINGS = {
+  zh: {
+    brand:'AI 知识库助手', brandSub:'把文档变成可问答的助手 · 交互原型', cMemory:'记忆', cRag:'RAG 检索', cWeb:'联网搜索', protoTag:'演示原型', viewSource:'查看源码 ↗',
+    sideTitle:'📚 知识库', newChat:'＋ 新对话', send:'发送', inputPh:'输入问题，回车发送…',
+    setTitle:'接入大模型（可选）', setKey:'API Key', setUrl:'Base URL', setModel:'模型', cancel:'取消', save:'保存',
+    setHint:'不填则默认演示模式：回答来自预设话术与知识库检索。填入后可生成自然回答（保存在本机浏览器，不会写进文件）。',
+    foot:(kb)=>`已接入 ${kb.length} 篇知识文档`,
+    emptyH:'AI 知识库助手', emptyP:'把团队文档变成可问答的智能助手——上传资料，成员用自然语言提问，回答基于资料并标注出处。', protoNote:'本页面为交互原型，所有数据均为演示用途。',
+    featTitle:'核心能力', features:['💬 智能问答','🔗 来源溯源','🔄 多轮对话','🎤 语音交互','🌐 联网搜索','🌍 中英双语'],
+    tryTitle:'试试问我', sug:['这个助手能做什么？','它和普通聊天 AI 有什么区别？','回答会标注来源吗？','支持语音交互吗？'],
+    noAnswer:'抱歉，知识库中没有检索到相关内容。', webSearch:'🔎 正在联网搜索…', webTag:'模拟搜索',
+    typing:'正在思考…', read:'朗读', assistant:'助手', indexed:'已接入', simulated:'（模拟数据，演示联网搜索效果）',
+  },
+  en: {
+    brand:'AI Knowledge Assistant', brandSub:'Turn docs into an answerable assistant · Prototype', cMemory:'Memory', cRag:'RAG', cWeb:'Web search', protoTag:'Prototype', viewSource:'View source ↗',
+    sideTitle:'📚 Knowledge base', newChat:'＋ New chat', send:'Send', inputPh:'Type a question, press Enter…',
+    setTitle:'Connect LLM (optional)', setKey:'API Key', setUrl:'Base URL', setModel:'Model', cancel:'Cancel', save:'Save',
+    setHint:'Leave empty for demo mode: answers come from preset replies and knowledge-base retrieval. Fill in to get natural answers (stored only in this browser).',
+    foot:(kb)=>`${kb.length} knowledge documents connected`,
+    emptyH:'AI Knowledge Assistant', emptyP:'Turn your team\'s documents into an answerable assistant — upload material, ask in natural language, get grounded answers with cited sources.', protoNote:'This page is an interactive prototype; all data is for demonstration only.',
+    featTitle:'Key capabilities', features:['💬 Smart Q&A','🔗 Source tracing','🔄 Multi-turn','🎤 Voice','🌐 Web search','🌍 Bilingual'],
+    tryTitle:'Try asking me', sug:['What can this assistant do?','How is it different from a general chatbot?','Are answers cited?','Does it support voice?'],
+    noAnswer:'Sorry, no relevant content found in the knowledge base.', webSearch:'🔎 Searching the web…', webTag:'Simulated',
+    typing:'Thinking…', read:'Read aloud', assistant:'Assistant', indexed:'connected', simulated:'(simulated — demonstrates web search)',
+  },
+};
+
+/* ================= 3. 向量检索（TF-IDF，浏览器内 RAG） ================= */
+function tokens(text) {
+  const t = text.toLowerCase();
+  const words = t.match(/[a-z0-9]+/g) || [];
+  const cjk = t.match(/[一-鿿]/g) || [];
+  const bigrams = [];
+  for (let i = 0; i < cjk.length - 1; i++) bigrams.push(cjk[i] + cjk[i + 1]);
+  const wordBigrams = [];
+  for (let i = 0; i < words.length - 1; i++) wordBigrams.push(words[i] + '_' + words[i + 1]);
+  return words.concat(cjk, bigrams, wordBigrams);
+}
+function buildIndex(kb) {
+  const docs = kb.map(d => ({ title: d.title, content: d.content, full: d.title + '\n' + d.content }));
+  const tokDocs = docs.map(d => tokens(d.full));
+  const df = {};
+  for (const toks of tokDocs) {
+    const seen = new Set(toks);
+    for (const tk of seen) df[tk] = (df[tk] || 0) + 1;
+  }
+  const N = docs.length;
+  const idf = {};
+  for (const tk in df) idf[tk] = Math.log((N + 1) / (df[tk] + 1)) + 1;
+  const vecs = tokDocs.map(toks => {
+    const tf = {};
+    for (const tk of toks) tf[tk] = (tf[tk] || 0) + 1;
+    const v = {};
+    for (const tk in tf) v[tk] = tf[tk] * idf[tk];
+    return v;
+  });
+  return { docs, vecs, idf };
+}
+function queryVec(text, idf) {
+  const tf = {};
+  for (const tk of tokens(text)) tf[tk] = (tf[tk] || 0) + 1;
+  const v = {};
+  for (const tk in tf) v[tk] = tf[tk] * (idf[tk] || 1);
+  return v;
+}
+function cosineSparse(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (const tk in a) { na += a[tk] * a[tk]; if (b[tk] !== undefined) dot += a[tk] * b[tk]; }
+  for (const tk in b) nb += b[tk] * b[tk];
+  if (!na || !nb) return 0;
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+function search(query, index, topK = 4) {
+  const qv = queryVec(query, index.idf);
+  return index.docs
+    .map((d, i) => ({ title: d.title, content: d.content, score: cosineSparse(qv, index.vecs[i]) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK);
+}
+
+/* ================= 3.5 拟真回答语料（预设演示话术） ================= */
+const QA = {
+  zh: [
+    { q:['能做什么','干什么','功能','用途','是什么','简介','介绍'], a:'我是「AI 知识库助手」：团队上传文档后，成员用自然语言提问，我基于资料给出答案并标注出处。核心能力有智能问答、多轮对话、语音交互、联网搜索、中英双语。你可以点上方建议问题，或直接打字问我。' },
+    { q:['区别','普通','chatgpt','gpt','通用','其他','不一样','不同'], a:'和通用聊天 AI 最大的区别：通用 AI 凭记忆生成、可能“一本正经地胡说”；我回答前先从你的资料里检索相关内容，再据此回答，并标注来源、可点开原文核对，做到有据可查、可溯源。' },
+    { q:['来源','出处','引用','原文','靠谱','可信','准确','依据'], a:'会。每次回答我都会标注引用的资料，点击下方来源标签即可展开原文核对，保证答案有据可查。' },
+    { q:['语音','说话','念','播报','读','sound','voice'], a:'支持语音交互：点输入框左侧的 🎤 可以语音提问，点回答下方的 🔊 可以朗读回答。' },
+    { q:['记忆','多轮','上下文','追问','连续','记得'], a:'支持多轮对话：我会记住同一会话里的上下文，你可以连续追问——比如先问“支持哪些文件格式”，再问“那 Word 呢”，我能接着上下文回答。' },
+    { q:['联网','搜索','实时','最新','上网'], a:'支持联网搜索：打开右上角“联网搜索”开关后，遇到需要最新信息的问题，我会实时搜索网络并补充回答（演示模式为模拟结果）。' },
+    { q:['上传','文档','格式','pdf','word','导入','资料','文件','支持'], a:'支持 PDF、Word、TXT、Markdown 等常见格式。上传后系统自动完成解析、切块、索引，即可开始提问。' },
+    { q:['安全','私有','部署','数据','保密','隐私','泄露'], a:'资料仅用于你自己的知识库，不会外泄；支持私有化部署，数据可以完全留在你自己的环境里。' },
+    { q:['训练','模型','配置','搭建','实现','技术','架构','原理','怎么','如何'], a:'这是交互原型，重点展示产品形态与交互流程。背后的完整实现基于 FastAPI + LangChain，用向量检索做 RAG、Redis 存对话记忆，语音与联网搜索做增强。' },
+    { q:['价格','收费','多少钱','付费','免费','会员','定价','套餐'], a:'原型不涉及定价。作为产品演示，这里聚焦“知识库问答”的核心能力与交互体验，你可以直接体验问与答的完整流程。' },
+  ],
+  en: [
+    { q:['what can','do','feature','what is','about','introduce','help'], a:'I\'m an AI Knowledge Assistant: after your team uploads documents, members ask in natural language and I answer from the material with cited sources. Key capabilities: smart Q&A, multi-turn dialogue, voice, web search, and bilingual support. Click a suggested question above or type your own.' },
+    { q:['difference','general','chatgpt','gpt','different','vs','other'], a:'The key difference from a general chatbot: general AI generates from memory and can confidently make things up; I retrieve relevant passages from your material first, then answer, citing sources you can click to verify.' },
+    { q:['source','cite','citation','reference','reliable','accurate','original'], a:'Yes. Every answer cites the source material; click a source tag below to expand the original text and verify.' },
+    { q:['voice','speak','read','listen','audio'], a:'Voice is supported: click the 🎤 on the left of the input to ask by voice, and the 🔊 under any answer to read it aloud.' },
+    { q:['memory','context','follow','multi-turn','remember'], a:'Multi-turn dialogue is supported: I remember the context within a session, so you can ask follow-ups like "which formats?" then "what about Word?"' },
+    { q:['web','search','real-time','latest','internet','online'], a:'Web search is supported: toggle "Web search" in the header and I\'ll fetch live info for questions your docs don\'t cover (simulated in demo mode).' },
+    { q:['upload','document','format','pdf','word','import','file','support'], a:'PDF, Word, TXT and Markdown are supported. Once uploaded, the system parses, chunks and indexes them automatically — then just ask.' },
+    { q:['secure','private','deploy','data','privacy','safe'], a:'Your material stays in your own knowledge base and is never shared; private deployment keeps data fully in your environment.' },
+    { q:['train','model','build','implement','tech','architecture','how'], a:'This is an interactive prototype focused on product form and interaction flow. The full implementation behind it is built on FastAPI + LangChain, using vector search for RAG and Redis for conversation memory, plus voice and web search.' },
+    { q:['price','cost','pay','paid','free','pricing','member'], a:'This prototype does not involve pricing. As a product demo it focuses on the core capability and interaction flow of knowledge-base Q&A — just experience the ask-and-answer flow.' },
+  ],
+};
+
+/* ================= 4. 状态 ================= */
+let lang = 'zh';
+let webOn = false;
+let sessionId = (Math.random().toString(36).slice(2, 14));
+const sessions = {};          // sessionId -> [{role, content}]
+let indexed = buildIndex(KB_ZH);
+let recognition = null;
+
+/* ================= 5. 模拟联网搜索 ================= */
+function mockWebSearch(query) {
+  return [{
+    title: lang === 'zh' ? '（模拟）来自网络的实时搜索结果' : '(Simulated) Live result from the web',
+    url: 'example.com/result',
+    content: lang === 'zh'
+      ? `关于「${query}」，互联网上有大量相关文章与最新资讯。（模拟数据，用于演示联网搜索的交互效果）`
+      : `The web has many articles and the latest updates about "${query}". (Simulated data — demonstrates the web search interaction.)`,
+    source: 'web', simulated: true, score: 0.6,
+  }];
+}
+
+/* ================= 6. 回答生成 ================= */
+function offlineAnswer(hits) {
+  if (!hits.length) return STRINGS[lang].noAnswer;
+  return hits.slice(0, 2).map(h => h.content.trim()).join('\n\n');
+}
+async function callLLM(messages) {
+  let cfg = null;
+  try { cfg = JSON.parse(localStorage.getItem('llmConfig') || 'null'); } catch (e) {}
+  if (!cfg || !cfg.apiKey) return null;
+  try {
+    const url = (cfg.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '') + '/chat/completions';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
+      body: JSON.stringify({ model: cfg.model || 'gpt-4o-mini', messages, temperature: 0.3 }),
+    });
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || null;
+  } catch (e) { return null; }
+}
+function matchQA(question) {
+  const q = question.toLowerCase();
+  for (const item of (QA[lang] || QA.zh)) {
+    if (item.q.some(kw => q.includes(kw))) return item.a;
+  }
+  return null;
+}
+async function generateAnswer(question, history, hits) {
+  const context = hits.map(h => `[${h.title}]\n${h.content}`).join('\n\n');
+  const sys = lang === 'zh'
+    ? '你是知识库问答助手，仅依据参考资料回答，资料没有就如实说明，用中文回答。'
+    : 'You are a knowledge-base assistant. Answer only from the provided references; say so if not covered. Reply in English.';
+  const real = await callLLM([{ role: 'system', content: sys },
+    ...history.slice(-6),
+    { role: 'user', content: `参考资料：\n${context}\n\n问题：${question}` }]);
+  if (real) return real;
+  const preset = matchQA(question);
+  if (preset) return preset;
+  return offlineAnswer(hits);
+}
+
+/* ================= 7. 渲染 ================= */
+const $ = id => document.getElementById(id);
+function t(key) { return STRINGS[lang][key]; }
+
+function renderEmpty() {
+  $('chat').innerHTML = `
+    <div class="empty">
+      <div class="big">🤖</div>
+      <h2>${t('emptyH')}</h2>
+      <p>${t('emptyP')}</p>
+      <div class="proto-note">${t('protoNote')}</div>
+      <div class="feat-title">${t('featTitle')}</div>
+      <div class="features">${t('features').map(f => `<span class="f">${f}</span>`).join('')}</div>
+      <div class="try-title">${t('tryTitle')}</div>
+      <div class="sug">${t('sug').map(s => `<span class="s" onclick="askPreset(this.textContent)">${s}</span>`).join('')}</div>
+    </div>`;
+}
+function askPreset(q) { $('input').value = q; send(); }
+
+function addMsg(role, text, sources) {
+  const chat = $('chat');
+  const empty = chat.querySelector('.empty');
+  if (empty) empty.remove();
+  const msg = document.createElement('div');
+  msg.className = 'msg ' + role;
+  if (role === 'bot') {
+    const head = document.createElement('div');
+    head.className = 'role';
+    head.innerHTML = `🤖 ${t('assistant')} <span class="speak" title="${t('read')}">🔊</span>`;
+    head.querySelector('.speak').onclick = () => speak(text);
+    msg.appendChild(head);
+  }
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+  msg.appendChild(bubble);
+
+  if (sources && sources.length) {
+    const max = Math.max(...sources.map(s => s.score)) || 1;
+    const wrap = document.createElement('div');
+    wrap.className = 'sources';
+    sources.forEach((s, i) => {
+      const chip = document.createElement('span');
+      chip.className = 'src' + (s.source === 'web' ? ' web' : '');
+      const rel = Math.max(12, Math.round(s.score / max * 100));
+      const icon = s.source === 'web' ? '🌐' : '📄';
+      const tag = s.source === 'web' ? ` · ${t('webTag')}` : '';
+      chip.innerHTML = `${icon} ${s.title}${tag}<span class="bar"><span class="fill" style="width:${rel}%"></span></span>`;
+      chip.onclick = () => toggleSrc(wrap, i, s);
+      wrap.appendChild(chip);
+    });
+    msg.appendChild(wrap);
+  }
+  chat.appendChild(msg);
+  chat.scrollTop = chat.scrollHeight;
+  return msg;
+}
+
+function toggleSrc(wrap, idx, s) {
+  // 手风琴：先收起同组其他已展开的来源
+  wrap.querySelectorAll('.src-body.show').forEach(b => { if (b.dataset.i !== String(idx)) b.classList.remove('show'); });
+  let body = wrap.querySelector(`.src-body[data-i="${idx}"]`);
+  if (body) { body.classList.toggle('show'); return; }
+  body = document.createElement('div');
+  body.className = 'src-body show';
+  body.dataset.i = idx;
+  body.textContent = s.content + (s.simulated ? `\n\n${t('simulated')}` : '');
+  wrap.appendChild(body);
+}
+
+function showTyping(withSearch) {
+  const chat = $('chat');
+  const empty = chat.querySelector('.empty');
+  if (empty) empty.remove();
+  const div = document.createElement('div');
+  div.className = 'msg bot';
+  div.id = 'typing';
+  let html = `<div class="role">🤖 ${t('assistant')}</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  if (withSearch) html += `<div class="searching">${t('webSearch')}</div>`;
+  div.innerHTML = html;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+function hideTyping() { const el = $('typing'); if (el) el.remove(); }
+
+/* ================= 8. 主流程 ================= */
+async function send() {
+  const input = $('input');
+  const q = input.value.trim();
+  if (!q) return;
+  input.value = '';
+  addMsg('user', q);
+  showTyping(webOn);
+  // 模拟联网搜索延迟
+  if (webOn) await new Promise(r => setTimeout(r, 700));
+
+  const history = sessions[sessionId] || [];
+  const hits = search(q, indexed, 4);
+  let sources = hits.map(h => ({ title: h.title, score: h.score, content: h.content, source: 'kb' }));
+  if (webOn) sources = sources.concat(mockWebSearch(q));
+
+  const answer = await generateAnswer(q, history, hits);
+  hideTyping();
+  addMsg('bot', answer, sources);
+
+  sessions[sessionId] = history.concat(
+    [{ role: 'user', content: q }, { role: 'assistant', content: answer }]
+  );
+}
+
+async function newChat() {
+  sessions[sessionId] = [];
+  sessionId = (Math.random().toString(36).slice(2, 14));
+  renderEmpty();
+}
+
+/* ================= 9. 语音（Web Speech API） ================= */
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  const u = new SpeechSynthesisUtterance(text.replace(/[「」【】*#]/g, ''));
+  u.lang = lang === 'zh' ? 'zh-CN' : 'en-US';
+  u.rate = 1;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+function toggleMic() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    addMsg('bot', lang === 'zh' ? '当前浏览器不支持语音输入（建议使用 Chrome）。' : 'Voice input is not supported in this browser (try Chrome).');
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!recognition) {
+    recognition = new SR();
+    recognition.lang = lang === 'zh' ? 'zh-CN' : 'en-US';
+    recognition.interimResults = false;
+    recognition.onresult = e => {
+      const text = e.results[0][0].transcript;
+      $('input').value = text;
+      send();
+    };
+    recognition.onend = () => $('mic').classList.remove('rec');
+    recognition.onerror = () => $('mic').classList.remove('rec');
+  }
+  recognition.lang = lang === 'zh' ? 'zh-CN' : 'en-US';
+  $('mic').classList.add('rec');
+  recognition.start();
+}
+
+/* ================= 10. 语言 / 联网开关 / 设置 ================= */
+function toggleLang() {
+  lang = lang === 'zh' ? 'en' : 'zh';
+  indexed = buildIndex(lang === 'zh' ? KB_ZH : KB_EN);
+  $('langBtn').textContent = lang === 'zh' ? 'EN' : '中文';
+  applyI18n();
+  renderKB();
+  renderEmpty();
+}
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.getAttribute('data-i18n');
+    if (k === 'brandSub') el.textContent = t('brandSub');
+    else el.textContent = t(k);
+  });
+  $('input').placeholder = t('inputPh');
+}
+function renderKB() {
+  const kb = lang === 'zh' ? KB_ZH : KB_EN;
+  $('kbList').innerHTML = kb.map(d =>
+    `<div class="kb-item"><div class="t">📄 ${d.title}</div><div class="m">${t('indexed')}</div></div>`
+  ).join('');
+  $('sideFoot').innerHTML = t('foot')(kb);
+}
+function toggleWeb() {
+  webOn = !webOn;
+  const chip = $('chipWeb');
+  chip.classList.toggle('off', !webOn);
+}
+function hasLLM() { try { return !!(JSON.parse(localStorage.getItem('llmConfig') || 'null')?.apiKey); } catch (e) { return false; } }
+function openSettings() {
+  $('modalBg').classList.add('show');
+  try {
+    const c = JSON.parse(localStorage.getItem('llmConfig') || 'null');
+    if (c) { $('cfgKey').value = c.apiKey || ''; $('cfgUrl').value = c.baseUrl || 'https://api.openai.com/v1'; $('cfgModel').value = c.model || 'gpt-4o-mini'; }
+  } catch (e) {}
+}
+function closeSettings() { $('modalBg').classList.remove('show'); }
+function saveSettings() {
+  const cfg = { apiKey: $('cfgKey').value.trim(), baseUrl: $('cfgUrl').value.trim(), model: $('cfgModel').value.trim() };
+  try { localStorage.setItem('llmConfig', JSON.stringify(cfg)); } catch (e) {}
+  $('chipLLM').style.display = cfg.apiKey ? 'flex' : 'none';
+  closeSettings();
+  renderKB();
+}
+
+/* ================= 11. 初始化 ================= */
+$('input').addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+$('modalBg').addEventListener('click', e => { if (e.target === $('modalBg')) closeSettings(); });
+applyI18n();
+renderKB();
+$('chipLLM').style.display = hasLLM() ? 'flex' : 'none';
+renderEmpty();
+</script>
+</body>
+</html>
